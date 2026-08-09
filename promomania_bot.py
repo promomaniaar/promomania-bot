@@ -105,7 +105,7 @@ def obtener_categorias(access_token):
     return [c["id"] for c in resp.json()]
 
 
-def buscar_ofertas_en_categoria(access_token, category_id, limite_paginas=2):
+def buscar_ofertas_en_categoria(access_token, category_id, limite_paginas=1):
     """
     Recorre los resultados de búsqueda de una categoría y devuelve
     los productos cuyo descuento supera DESCUENTO_MINIMO.
@@ -119,9 +119,10 @@ def buscar_ofertas_en_categoria(access_token, category_id, limite_paginas=2):
         params = {"category": category_id, "limit": 50, "offset": offset}
 
         try:
-            resp = requests.get(url, headers=headers, params=params, timeout=30)
+            resp = requests.get(url, headers=headers, params=params, timeout=10)
             resp.raise_for_status()
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
+            print(f"     (timeout o error en esta página, se saltea: {e})", flush=True)
             break
 
         data = resp.json()
@@ -211,24 +212,27 @@ def seleccionar_mejores(ofertas, cantidad):
 
 
 def ejecutar_busqueda():
-    print(f"[{datetime.now()}] Iniciando búsqueda de ofertas...")
+    print(f"[{datetime.now()}] Iniciando búsqueda de ofertas...", flush=True)
 
     conn = init_db()
     access_token = obtener_access_token()
     categorias = obtener_categorias(access_token)
+    print(f"[{datetime.now()}] Se encontraron {len(categorias)} categorías para revisar.", flush=True)
 
     todas_las_ofertas = []
 
-    for cat_id in categorias:
+    for i, cat_id in enumerate(categorias, start=1):
+        print(f"[{datetime.now()}] Revisando categoría {i}/{len(categorias)}: {cat_id}", flush=True)
         try:
             ofertas = buscar_ofertas_en_categoria(access_token, cat_id)
         except requests.exceptions.RequestException as e:
-            print(f"Error en categoría {cat_id}: {e}")
+            print(f"  -> Error en categoría {cat_id}: {e}", flush=True)
             continue
 
         # Descartamos las que ya te mandamos en ciclos anteriores
         ofertas_nuevas = [o for o in ofertas if not ya_fue_enviado(conn, o["id"])]
         todas_las_ofertas.extend(ofertas_nuevas)
+        print(f"  -> {len(ofertas_nuevas)} oportunidades nuevas encontradas en esta categoría.", flush=True)
 
     mejores = seleccionar_mejores(todas_las_ofertas, MAX_ALERTAS_POR_CICLO)
 
@@ -246,11 +250,4 @@ def ejecutar_busqueda():
 
 
 if __name__ == "__main__":
-    while True:
-        try:
-            ejecutar_busqueda()
-        except Exception as e:
-            print(f"Error general: {e}")
-
-        print(f"Esperando {INTERVALO_MINUTOS} minutos hasta la próxima búsqueda...")
-        time.sleep(INTERVALO_MINUTOS * 60)
+    ejecutar_busqueda()
