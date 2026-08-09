@@ -45,6 +45,11 @@ ML_API = "https://api.mercadolibre.com"
 
 DB_PATH = "ofertas_enviadas.db"
 
+# Identificación para evitar que la API nos bloquee como tráfico genérico/bot
+HEADERS_BASE = {
+    "User-Agent": "PromoManiaBot/1.0 (+https://github.com/)"
+}
+
 # ---------------------------------------------------------------------
 # Base de datos simple para no repetir la misma alerta dos veces
 # ---------------------------------------------------------------------
@@ -99,8 +104,7 @@ def obtener_access_token():
 
 def obtener_categorias(access_token):
     url = f"{ML_API}/sites/{SITE_ID}/categories"
-    headers = {"Authorization": f"Bearer {access_token}"}
-    resp = requests.get(url, headers=headers, timeout=30)
+    resp = requests.get(url, headers=HEADERS_BASE, timeout=15)
     resp.raise_for_status()
     return [c["id"] for c in resp.json()]
 
@@ -110,7 +114,7 @@ def buscar_ofertas_en_categoria(access_token, category_id, limite_paginas=1):
     Recorre los resultados de búsqueda de una categoría y devuelve
     los productos cuyo descuento supera DESCUENTO_MINIMO.
     """
-    headers = {"Authorization": f"Bearer {access_token}"}
+    headers = {**HEADERS_BASE, "Authorization": f"Bearer {access_token}"}
     ofertas = []
 
     for pagina in range(limite_paginas):
