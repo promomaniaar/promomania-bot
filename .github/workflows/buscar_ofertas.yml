@@ -1,0 +1,41 @@
+name: Buscar ofertas en Mercado Libre
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # cada 30 minutos
+  workflow_dispatch:          # permite ejecutarlo manualmente para probar
+
+permissions:
+  contents: write            # necesario para guardar el registro de ofertas ya enviadas
+
+jobs:
+  buscar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el código del repositorio
+        uses: actions/checkout@v4
+
+      - name: Preparar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Ejecutar búsqueda de ofertas
+        env:
+          ML_CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
+          ML_CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
+          ML_REFRESH_TOKEN: ${{ secrets.ML_REFRESH_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python promomania_bot.py
+
+      - name: Guardar el registro de ofertas ya enviadas
+        run: |
+          git config user.name "PromoManiaBot"
+          git config user.email "bot@promomania.local"
+          git add ofertas_enviadas.db
+          git diff --quiet --cached || git commit -m "Actualizar registro de ofertas enviadas"
+          git push
